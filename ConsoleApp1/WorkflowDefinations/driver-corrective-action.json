@@ -1,0 +1,114 @@
+{
+	"Id": "FleetTracker",
+	"Version": 1,
+	"DataType": "ConsoleApp1.FleetInfo, ConsoleApp1 ",
+	"Steps": [
+		{
+			"Id": "InitiateCorrectiveAction",
+			"StepType": "WorkflowCore.Primitives.WaitFor, WorkflowCore",
+			"Inputs": {
+				"EventName": "\"ExternalEvent\"",
+				"EventKey": "\"(data, context) => context.Workflow.Id\"",
+				"EffectiveDate": "\"DateTime.Now\""
+			},
+			"Do": [
+				[
+					{
+						"Id": "Escalate",
+						"StepType": "WorkflowCore.Primitives.If, WorkflowCore",
+						"Inputs": { "Condition": "data.AlertCount>=data.AlertThreshold" },
+						"Do": [
+							[
+								{
+									"Id": "EscalateCorrectiveAction",
+									"StepType": "ConsoleApp1.EscalateCorrectiveAction, ConsoleApp1"
+								}
+							]
+						]
+					},
+					{
+						"Id": "Print",
+						"StepType": "ConsoleApp1.Print, ConsoleApp1",
+						"NextStepId": "AssignCourse"
+					}
+				]
+			]
+		},
+		{
+			"Id": "AssignCourse",
+			"StepType": "WorkflowCore.Primitives.WaitFor, WorkflowCore",
+			"Inputs": {
+				"EventName": "\"AssignCourse\"",
+				"EventKey": "\"(data, context) => context.Workflow.Id\"",
+				"EffectiveDate": "\"DateTime.Now\""
+			},
+			"Do": [
+				[
+					{
+						"Id": "NotifyAssignCourse",
+						"StepType": "ConsoleApp1.Notify, ConsoleApp1"
+					}
+				]
+			]
+		},
+		{
+			"Id": "AcceptCourse",
+			"StepType": "WorkflowCore.Primitives.WaitFor, WorkflowCore",
+			"Inputs": {
+				"EventName": "\"AcceptCourse\"",
+				"EventKey": "\"(data, context) => context.Workflow.Id\"",
+				"EffectiveDate": "\"DateTime.Now\""
+			},
+			"Do": [
+				[
+					{
+						"Id": "NotifyDriver",
+						"StepType": "WorkflowCore.Primitives.Recur, WorkflowCore",
+						"Inputs": {
+							"Interval": "DateTime.Now - data.LastNotificationSent >= data.NotificationInterval",
+							"StopCondition": "data.CorrectiveActionCompleted==true"
+						},
+						"Do": [
+							[
+								{
+									"Id": "RemindDriverToCompleteTheCourse",
+									"StepType": "ConsoleApp1.Notify, ConsoleApp1"
+								}
+							]
+						]
+					}
+				]
+			]
+		},
+		{
+			"Id": "CourseComplete",
+			"StepType": "WorkflowCore.Primitives.WaitFor, WorkflowCore",
+			"Inputs": {
+				"EventName": "\"CourseComplete\"",
+				"EventKey": "\"(data, context) => context.Workflow.Id\"",
+				"EffectiveDate": "\"DateTime.Now\""
+			},
+			"Do": [
+				[
+					{
+						"Id": "NotifyCourseComplete",
+						"StepType": "ConsoleApp1.Notify, ConsoleApp1"
+					},
+					{
+						"Id": "CloseIfNoMoreAlerts",
+						"StepType": "WorkflowCore.Primitives.Schedule, WorkflowCore",
+						"Inputs": { "Interval": "data.CorrectiveActionCompleted==true && data.LastEventOccured.AddMonths(6)>DateTime.Now" },
+						"Do": [
+							[
+								{
+									"Id": "do1",
+									"StepType": "ConsoleApp1.CloseCorrectiveAction, ConsoleApp1"
+								}
+							]
+						]
+					}
+				]
+			]
+		}
+	]
+}
